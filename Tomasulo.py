@@ -83,7 +83,7 @@ class Instruction:
             self.rs2 = vec[1]
             self.offset = int(tempvec[0])
             self.rs1 = tempvec[1][:-1]
-        elif self.op == "BEQ":  # BEQ RS1, RS2, offset
+        elif self.op == "BEQ":  # BEQ RS1, RS2, label
             self.rs1 = vec[1]
             self.rs2 = vec[2]
             self.label = int(vec[3])
@@ -127,14 +127,16 @@ class Tomasulo:
         self.instructions.append(Instruction("LOAD R2 1(R0)"))
         self.instructions.append(Instruction("LOAD R3 2(R0)"))
         # self.instructions.append(Instruction("BEQ R0 R0 2"))
-        self.instructions.append(Instruction("CALL 2"))
+        self.instructions.append(Instruction("CALL 5"))
         self.instructions.append(Instruction("ADD R4 R2 R3"))
         self.instructions.append(Instruction("MUL R5 R2 R3"))
         self.instructions.append(Instruction("NAND R6 R2 R3"))
         self.instructions.append(Instruction("ADD R10 R4 R6"))
         self.instructions.append(Instruction("ADD R11 R10 R3"))
         self.instructions.append(Instruction("ADD R12 R4 R3"))
+
         self.instructions.append(Instruction("ADDI R14 R14 100"))
+
 
         for inst in self.instructions:
             self.remaining_instructions.append(inst)
@@ -208,10 +210,12 @@ class Tomasulo:
                     if rs.busy and rs.qj is None and rs.qk is None:
                         if rs.instruction.start_exec_time == 0:
                             rs.instruction.start_exec_time = self.current_cycle
+
                             if rs.instruction.op in ["BEQ", "RET", "CALL"]:
                                 self.execution_flag = False
                                 if rs.instruction.op == "BEQ":
                                     registers["R0"].value = self.pc
+
                         rs.cycles -= 1
                         rs.instruction.cycles_left_in_execution -= 1
                         if rs.cycles == 0 :
@@ -226,14 +230,17 @@ class Tomasulo:
                                 if rs.vj == rs.vk:
                                     # self.pc += rs.instruction.label
                                     self.pc = registers["R0"].value+ rs.instruction.label
-
                                     self.mispredictions += 1
                             if rs.op == "CALL":
-                                registers["R1"].value = self.pc+1
+                                registers["R1"].value = self.pc
                                 self.pc = rs.instruction.label
+                                print(self.pc)
                                 self.execution_flag = True
                             if rs.op == "RET":
-                                self.pc = registers["R1"].value  # jump to the last call
+                                self.execution_flag = True
+                                if registers["R1"].value != -1:
+                                    self.pc = registers["R1"].value  # jump to the last call
+                                    registers["R1"].value= -1
 
                             if rs.op == "ADD":
                                 rs.result = rs.vj + rs.vk
