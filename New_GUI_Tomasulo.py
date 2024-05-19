@@ -1,4 +1,3 @@
-
 import tkinter as tk
 from tkinter import ttk, filedialog, StringVar, Listbox, END
 from collections import deque
@@ -94,15 +93,15 @@ class Instruction:
 
 def get_cycles(op):
     cycle_dict = {
-        "LOAD": 6,
-        "STORE": 6,
-        "ADD": 2,
-        "NAND": 1,
-        "MUL": 8,
-        "BEQ": 1,
-        "CALL": 1,
-        "RET": 1,
-        "ADDI": 2
+        "LOAD": load_cycles,
+        "STORE": store_cycles,
+        "ADD": add_cycles,
+        "NAND": nand_cycles,
+        "MUL": mul_cycles,
+        "BEQ": beq_cycles,
+        "CALL": call_cycles,
+        "RET": ret_cycles,
+        "ADDI": addi_cycles
     }
     return cycle_dict.get(op, 1)
 
@@ -282,17 +281,7 @@ def print_memory(Memory):
     print("********************************************")
 
 
-reservation_stations = {
-    'LOAD': [ReservationStation(f"LOAD{i}", 'LOAD') for i in range(2)],
-    'STORE': [ReservationStation(f"STORE{i}", 'STORE') for i in range(1)],
-    'ADD': [ReservationStation(f"ADD{i}", 'ADD') for i in range(4)],
-    'NAND': [ReservationStation(f"NAND{i}", 'NAND') for i in range(2)],
-    'MUL': [ReservationStation(f"MUL{i}", 'MUL') for i in range(1)],
-    'BEQ': [ReservationStation(f"BEQ{i}", 'BEQ') for i in range(1)],
-    'CALL': [ReservationStation(f"CALL{i}", 'CALL') for i in range(1)],
-    'RET': [ReservationStation(f"RET{i}", 'RET') for i in range(1)],
-}
-
+reservation_stations = {}
 registers = {f"R{i}": Register() for i in range(8)}
 registers["R0"].value = 0
 
@@ -405,6 +394,7 @@ def run_simulation():
     for inst in tomasulo.instructions:
         tree.insert('', END, values=(inst.inst, inst.issue_time, inst.start_exec_time, inst.end_exec_time,  inst.wb_time))
     tomasulo.update_stats()
+
 def reset_simulation():
     # Clear instructions and UI elements
     instructions.clear()
@@ -432,20 +422,129 @@ def reset_simulation():
         reg.busy = False
         reg.reorder = None
 
-       # reg_values[f"R{reg}"].set("0")
-
     # Reset stats
     ipc_value.set("")
     branches_value.set("")
     mispredictions_value.set("")
 
-
     print_registers(registers)
 
 
-# Initialize GUI
+# Initial setup window to get reservation stations and cycles
+def setup_window():
+    setup_root = tk.Toplevel(root)
+    setup_root.title("Setup Reservation Stations and Cycles")
+
+    def apply_settings():
+        global reservation_stations, load_cycles, store_cycles, add_cycles, nand_cycles, mul_cycles, beq_cycles, call_cycles, ret_cycles, addi_cycles
+
+        reservation_stations = {
+            'LOAD': [ReservationStation(f"LOAD{i}", 'LOAD') for i in range(int(load_rs_var.get()))],
+            'STORE': [ReservationStation(f"STORE{i}", 'STORE') for i in range(int(store_rs_var.get()))],
+            'ADD': [ReservationStation(f"ADD{i}", 'ADD') for i in range(int(add_rs_var.get()))],
+            'NAND': [ReservationStation(f"NAND{i}", 'NAND') for i in range(int(nand_rs_var.get()))],
+            'MUL': [ReservationStation(f"MUL{i}", 'MUL') for i in range(int(mul_rs_var.get()))],
+            'BEQ': [ReservationStation(f"BEQ{i}", 'BEQ') for i in range(int(beq_rs_var.get()))],
+            'CALL': [ReservationStation(f"CALL{i}", 'CALL') for i in range(int(call_rs_var.get()))],
+            'RET': [ReservationStation(f"RET{i}", 'RET') for i in range(int(ret_rs_var.get()))],
+        }
+
+        load_cycles = int(load_cycles_var.get())
+        store_cycles = int(store_cycles_var.get())
+        add_cycles = int(add_cycles_var.get())
+        nand_cycles = int(nand_cycles_var.get())
+        mul_cycles = int(mul_cycles_var.get())
+        beq_cycles = int(beq_cycles_var.get())
+        call_cycles = int(call_cycles_var.get())
+        ret_cycles = int(ret_cycles_var.get())
+        addi_cycles = int(addi_cycles_var.get())
+
+        setup_root.destroy()
+
+    ttk.Label(setup_root, text="Reservation Stations").grid(row=0, column=0, columnspan=2, pady=5)
+
+    ttk.Label(setup_root, text="LOAD:").grid(row=1, column=0, sticky="e")
+    load_rs_var = StringVar(value="2")
+    ttk.Entry(setup_root, textvariable=load_rs_var).grid(row=1, column=1)
+
+    ttk.Label(setup_root, text="STORE:").grid(row=2, column=0, sticky="e")
+    store_rs_var = StringVar(value="1")
+    ttk.Entry(setup_root, textvariable=store_rs_var).grid(row=2, column=1)
+
+    ttk.Label(setup_root, text="ADD:").grid(row=3, column=0, sticky="e")
+    add_rs_var = StringVar(value="4")
+    ttk.Entry(setup_root, textvariable=add_rs_var).grid(row=3, column=1)
+
+    ttk.Label(setup_root, text="NAND:").grid(row=4, column=0, sticky="e")
+    nand_rs_var = StringVar(value="2")
+    ttk.Entry(setup_root, textvariable=nand_rs_var).grid(row=4, column=1)
+
+    ttk.Label(setup_root, text="MUL:").grid(row=5, column=0, sticky="e")
+    mul_rs_var = StringVar(value="1")
+    ttk.Entry(setup_root, textvariable=mul_rs_var).grid(row=5, column=1)
+
+    ttk.Label(setup_root, text="BEQ:").grid(row=6, column=0, sticky="e")
+    beq_rs_var = StringVar(value="1")
+    ttk.Entry(setup_root, textvariable=beq_rs_var).grid(row=6, column=1)
+
+    ttk.Label(setup_root, text="CALL:").grid(row=7, column=0, sticky="e")
+    call_rs_var = StringVar(value="1")
+    ttk.Entry(setup_root, textvariable=call_rs_var).grid(row=7, column=1)
+
+    ttk.Label(setup_root, text="RET:").grid(row=8, column=0, sticky="e")
+    ret_rs_var = StringVar(value="1")
+    ttk.Entry(setup_root, textvariable=ret_rs_var).grid(row=8, column=1)
+
+    ttk.Label(setup_root, text="Cycles per Operation").grid(row=0, column=2, columnspan=2, pady=5)
+
+    ttk.Label(setup_root, text="LOAD:").grid(row=1, column=2, sticky="e")
+    load_cycles_var = StringVar(value="6")
+    ttk.Entry(setup_root, textvariable=load_cycles_var).grid(row=1, column=3)
+
+    ttk.Label(setup_root, text="STORE:").grid(row=2, column=2, sticky="e")
+    store_cycles_var = StringVar(value="6")
+    ttk.Entry(setup_root, textvariable=store_cycles_var).grid(row=2, column=3)
+
+    ttk.Label(setup_root, text="ADD:").grid(row=3, column=2, sticky="e")
+    add_cycles_var = StringVar(value="2")
+    ttk.Entry(setup_root, textvariable=add_cycles_var).grid(row=3, column=3)
+
+    ttk.Label(setup_root, text="NAND:").grid(row=4, column=2, sticky="e")
+    nand_cycles_var = StringVar(value="1")
+    ttk.Entry(setup_root, textvariable=nand_cycles_var).grid(row=4, column=3)
+
+    ttk.Label(setup_root, text="MUL:").grid(row=5, column=2, sticky="e")
+    mul_cycles_var = StringVar(value="8")
+    ttk.Entry(setup_root, textvariable=mul_cycles_var).grid(row=5, column=3)
+
+    ttk.Label(setup_root, text="BEQ:").grid(row=6, column=2, sticky="e")
+    beq_cycles_var = StringVar(value="1")
+    ttk.Entry(setup_root, textvariable=beq_cycles_var).grid(row=6, column=3)
+
+    ttk.Label(setup_root, text="CALL:").grid(row=7, column=2, sticky="e")
+    call_cycles_var = StringVar(value="1")
+    ttk.Entry(setup_root, textvariable=call_cycles_var).grid(row=7, column=3)
+
+    ttk.Label(setup_root, text="RET:").grid(row=8, column=2, sticky="e")
+    ret_cycles_var = StringVar(value="1")
+    ttk.Entry(setup_root, textvariable=ret_cycles_var).grid(row=8, column=3)
+
+    ttk.Label(setup_root, text="ADDI:").grid(row=9, column=2, sticky="e")
+    addi_cycles_var = StringVar(value="2")
+    ttk.Entry(setup_root, textvariable=addi_cycles_var).grid(row=9, column=3)
+
+    ttk.Button(setup_root, text="Apply", command=apply_settings).grid(row=10, column=0, columnspan=4, pady=10)
+
+    setup_root.transient(root)
+    setup_root.grab_set()
+    root.wait_window(setup_root)
+
+
+# ------------------------------------------------------------------------Initialize GUI------------------------------------------------------------------------
 root = tk.Tk()
 root.title("Tomasulo's Algorithm Simulator")
+
+setup_window()
 
 input_frame = ttk.LabelFrame(root, text="Add Instruction")
 input_frame.grid(row=0, column=0, padx=10, pady=10)
