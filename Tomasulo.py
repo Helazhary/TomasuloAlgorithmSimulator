@@ -322,7 +322,7 @@ reservation_stations = {
 # registers["R2"].value = 10
 # registers["R3"].value = 20
 
-registers = {f"R{i}": Register() for i in range(30)}
+registers = {f"R{i}": Register() for i in range(8)}
 registers["R0"].value = 0
 
 
@@ -334,4 +334,3 @@ for i in range(10):
 tomasulo = Tomasulo()
 tomasulo.get_instructions()
 tomasulo.run()
-
