@@ -124,18 +124,32 @@ class Tomasulo:
         self.execution_flag = True # it is false whenever there is a branch or Call and we are waiting for them
 
     def get_instructions(self):
-        self.instructions.append(Instruction("LOAD R2 1(R0)"))
-        self.instructions.append(Instruction("LOAD R3 2(R0)"))
-        # self.instructions.append(Instruction("BEQ R0 R0 2"))
-        self.instructions.append(Instruction("CALL 5"))
-        self.instructions.append(Instruction("ADD R4 R2 R3"))
-        self.instructions.append(Instruction("MUL R5 R2 R3"))
-        self.instructions.append(Instruction("NAND R6 R2 R3"))
-        self.instructions.append(Instruction("ADD R10 R4 R6"))
-        self.instructions.append(Instruction("ADD R11 R10 R3"))
-        self.instructions.append(Instruction("ADD R12 R4 R3"))
-
-        self.instructions.append(Instruction("ADDI R14 R14 100"))
+        # self.instructions.append(Instruction("LOAD R2 1(R0)"))
+        # self.instructions.append(Instruction("LOAD R3 2(R0)"))
+        # # self.instructions.append(Instruction("BEQ R0 R0 2"))
+        # self.instructions.append(Instruction("CALL 5"))
+        # self.instructions.append(Instruction("ADD R4 R2 R3"))
+        # self.instructions.append(Instruction("MUL R5 R2 R3"))
+        # self.instructions.append(Instruction("NAND R6 R2 R3"))
+        # self.instructions.append(Instruction("ADD R10 R4 R6"))
+        # self.instructions.append(Instruction("ADD R11 R10 R3"))
+        # self.instructions.append(Instruction("ADD R12 R4 R3"))
+        #
+        # self.instructions.append(Instruction("ADDI R14 R14 100"))
+        self.instructions.append(Instruction("LOAD R6 1(R0)"))
+        self.instructions.append(Instruction("LOAD R2 2(R0)"))
+        self.instructions.append(Instruction("ADD R3 R6 R2"))
+        self.instructions.append(Instruction("STORE R3 6(R0)"))
+        self.instructions.append(Instruction("NAND R4 R6 R2"))
+        self.instructions.append(Instruction("MUL R5 R6 R2"))
+        # self.instructions.append(Instruction("ADDI R6 R6 60"))
+        # self.instructions.append(Instruction("BEQ R0 R3 2"))
+        # self.instructions.append(Instruction("ADDI R7 R0 20"))
+        # self.instructions.append(Instruction("ADDI R7 R0 21"))
+        # # self.instructions.append(Instruction("RET"))
+        # # self.instructions.append(Instruction("CALL 13"))
+        # self.instructions.append(Instruction("ADDI R7 R0 20"))
+        # self.instructions.append(Instruction("ADDI R3 R0 40"))
 
 
         for inst in self.instructions:
@@ -163,8 +177,9 @@ class Tomasulo:
             self.issue()
             if self.is_finished():
                 break
-        print_timing_table(self.instructions)
+            print_timing_table(self.instructions)
         print_registers(registers)
+        print_memory(Memory)
 
 
 
@@ -179,7 +194,6 @@ class Tomasulo:
             for rs in rs_list:
                 if not rs.busy:
                     inst.issue_time = self.current_cycle
-                    print("inst issued", inst.inst)
                     rs.instruction = inst
                     rs.busy = True
                     rs.op = inst.op
@@ -223,7 +237,7 @@ class Tomasulo:
                                 rs.result = Memory[rs.instruction.offset + rs.vj]
                             if rs.op == "STORE":
                                 # rs.resul=None
-                                Memory[rs.instruction.offset + rs.instruction.vj] = rs.instruction.vk
+                                Memory[rs.instruction.offset + rs.vj] = rs.vk
                             if rs.op == "BEQ":
                                 self.branches += 1
                                 self.execution_flag = True
@@ -250,7 +264,6 @@ class Tomasulo:
                                 rs.result = ~(rs.vj & rs.vk) & 0xFFFF  # Ensure 16-bit result
                             elif rs.op == "MUL":
                                 rs.result = (rs.vj * rs.vk) & 0xFFFF  # Ensure 16-bit result
-                            print("done_excution", rs.instruction.inst, "at cycle", self.current_cycle)
                             rs.instruction.end_exec_time = self.current_cycle
                             rs.ready = True
 
@@ -262,7 +275,6 @@ class Tomasulo:
         for op, rs_list in reservation_stations.items():
             for rs in rs_list:
                 if rs.ready:
-                    print("wb",rs.instruction.inst, "at cycle", self.current_cycle)
                     rs.instruction.wb_time = self.current_cycle
                     self.total_write_backs += 1
                     station = rs.name
@@ -292,18 +304,27 @@ class Tomasulo:
 
 
 def print_registers(registers):
+
        print("Registers:")
        for reg_name, reg in registers.items():
            print(f"{reg_name}: {'BUSY' if reg.busy else 'FREE'}, Value: {reg.value}")
 
 def print_timing_table(instructions):
     # Print headers
+    print("--------------------------------------------------")
     print(f"{'Inst':<10} {'Issue':<10} {'Start Execute':<15} {'End Execute':<15} {'WB':<10}")
 
     # Print each instruction's timing
     for i, inst in enumerate(instructions):
         print(f"{inst.inst:<10} {inst.issue_time:<10} {inst.start_exec_time:<15} {inst.end_exec_time:<15} {inst.wb_time:<10}")
+    print("---------------------------------------------------------")
 
+def print_memory(Memory):
+    print("********************************************")
+    print("MEMORY:")
+    for i in range(10):
+        print(i,Memory[i])
+    print("********************************************")
 # Initialize reservation stations
 reservation_stations = {
     'LOAD': [ReservationStation(f"LOAD{i}", 'LOAD') for i in range(2)],
