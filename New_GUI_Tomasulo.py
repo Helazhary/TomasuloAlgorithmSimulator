@@ -109,13 +109,14 @@ def get_cycles(op):
 class Tomasulo:
     def __init__(self):
         self.instructions = []
-        self.remaining_instructions = []
+        self.remaining_instructions=0
         self.current_cycle = 0
         self.pc = 0
         self.total_write_backs = 0
         self.branches = 0
         self.mispredictions = 0
         self.execution_flag = True
+        self.MaxNumberOfCycles=200
 
     def update_stats(self):
         total_instructions = len(self.instructions)
@@ -134,7 +135,10 @@ class Tomasulo:
         return True
 
     def run(self):
-        while self.total_write_backs < len(self.instructions):
+        # while self.total_write_backs < len(self.instructions):
+        # self.remaining_instructions=len(self.instructions)
+        # while self.remaining_instructions>=0:        # a trick to give enough time for instructions to complete
+        while self.current_cycle<self.MaxNumberOfCycles:
             self.current_cycle += 1
             self.write_back()
             self.execute()
@@ -143,7 +147,7 @@ class Tomasulo:
                 break
             self.update_stats()
             print_timing_table(self.instructions)
-        print_registers(registers)
+            print_registers(registers)
         print_memory(Memory)
         self.update_stats()
 
@@ -178,18 +182,21 @@ class Tomasulo:
                         registers[inst.rd].reorder = rs.name
                     self.pc += 1
                     break
+        # self.remaining_instructions-=1
 
     def execute(self):
         if self.execution_flag:
             for op, rs_list in reservation_stations.items():
                 for rs in rs_list:
                     if rs.busy and rs.qj is None and rs.qk is None:
-                        if rs.instruction.start_exec_time == 0:
+                        # I added wb_time to fix overlapping of loops
+                        if rs.instruction.start_exec_time == 0 or rs.instruction.wb_time!=0:
                             rs.instruction.start_exec_time = self.current_cycle
-                            if rs.instruction.op in ["BEQ", "RET", "CALL"]:
+                            if rs.instruction.op in ["BEQ", "CALL"]:
                                 self.execution_flag = False
+
                                 if rs.instruction.op == "BEQ":
-                                    registers["R0"].value = self.pc
+                                    registers["R7"].value = self.pc
 
                         rs.cycles -= 1
                         rs.instruction.cycles_left_in_execution -= 1
@@ -201,8 +208,10 @@ class Tomasulo:
                             elif rs.op == "BEQ":
                                 self.branches += 1
                                 self.execution_flag = True
+                                print(rs.instruction.inst,"Cycles: ", self.current_cycle, "PC:",self.pc)
                                 if rs.vj == rs.vk:
-                                    self.pc = registers["R0"].value + rs.instruction.label
+                                    self.pc = registers["R7"].value + rs.instruction.label
+                                    print(rs.instruction.inst,"Taken", "PC:", self.pc)
                                     self.mispredictions += 1
                             elif rs.op == "CALL":
                                 registers["R1"].value = self.pc
@@ -210,9 +219,9 @@ class Tomasulo:
                                 self.execution_flag = True
                             elif rs.op == "RET":
                                 self.execution_flag = True
-                                if registers["R1"].value != -1:
-                                    self.pc = registers["R1"].value
-                                    registers["R1"].value = -1
+                                # if registers["R1"].value != -1:
+                                #     self.pc = registers["R1"].value
+                                #     registers["R1"].value = -1
                             elif rs.op == "ADD":
                                 rs.result = rs.vj + rs.vk
                             elif rs.op == "ADDI":
@@ -243,6 +252,8 @@ class Tomasulo:
                             reg.value = value
                             reg.busy = False
                             reg.reorder = None
+                    rs.clean()
+
 
         if station:
             for op2, rs_list2 in reservation_stations.items():
