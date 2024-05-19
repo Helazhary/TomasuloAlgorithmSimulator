@@ -1,5 +1,4 @@
 
-
 import tkinter as tk
 from tkinter import ttk, filedialog, StringVar, Listbox, END
 from collections import deque
@@ -118,6 +117,13 @@ class Tomasulo:
         self.mispredictions = 0
         self.execution_flag = True
 
+    def update_stats(self):
+        total_instructions = len(self.instructions)
+        ipc = total_instructions / self.current_cycle if self.current_cycle > 0 else 0
+        ipc_value.set(f"{ipc:.2f}")
+        branches_value.set(f"{self.branches}")
+        mispredictions_value.set(f"{self.mispredictions}")
+
     def is_finished(self):
         if self.current_cycle == 0:
             return False
@@ -135,9 +141,12 @@ class Tomasulo:
             self.issue()
             if self.is_finished():
                 break
+            self.update_stats()
             print_timing_table(self.instructions)
         print_registers(registers)
         print_memory(Memory)
+        self.update_stats()
+
 
     def issue(self):
         global reservation_stations, registers
@@ -378,6 +387,13 @@ def load_instructions_from_file():
                         instruction_list.insert(tk.END, instr_str)
                         tree.insert('', END, values=(instr_str, "", "", ""))
 
+def update_stats(self):
+    total_instructions = len(self.instructions)
+    ipc = total_instructions / self.current_cycle if self.current_cycle > 0 else 0
+    ipc_value.set(f"{ipc:.2f}")
+    branches_value.set(f"{self.branches}")
+    mispredictions_value.set(f"{self.mispredictions}")
+
 def run_simulation():
     tomasulo.instructions = instructions.copy()
     tomasulo.run()
@@ -388,7 +404,7 @@ def run_simulation():
     tree.delete(*tree.get_children())
     for inst in tomasulo.instructions:
         tree.insert('', END, values=(inst.inst, inst.issue_time, inst.start_exec_time, inst.end_exec_time,  inst.wb_time))
-
+    tomasulo.update_stats()
 def reset_simulation():
     # Clear instructions and UI elements
     instructions.clear()
@@ -401,6 +417,8 @@ def reset_simulation():
     tomasulo.pc = 0
     tomasulo.total_write_backs = 0
     tomasulo.execution_flag = True
+    tomasulo.branches = 0
+    tomasulo.mispredictions = 0
     result_text.set("")
 
     # Reset reservation stations
@@ -414,7 +432,16 @@ def reset_simulation():
         reg.busy = False
         reg.reorder = None
 
+       # reg_values[f"R{reg}"].set("0")
+
+    # Reset stats
+    ipc_value.set("")
+    branches_value.set("")
+    mispredictions_value.set("")
+
+
     print_registers(registers)
+
 
 # Initialize GUI
 root = tk.Tk()
@@ -473,6 +500,39 @@ tree.heading('execute', text='Execute')
 tree.heading('done_execute', text='Done_Execute')
 tree.heading('write_result', text='Write Result')
 tree.grid(row=0, column=0)
+
+result_frame = ttk.LabelFrame(root, text="Simulation Results")
+result_frame.grid(row=0, column=1, rowspan=2, padx=10, pady=10)
+result_text = StringVar()
+ttk.Label(result_frame, textvariable=result_text).grid(row=0, column=0, columnspan=2)
+reg_values = {f"R{i}": StringVar(value="0") for i in range(8)}
+for i in range(8):
+    ttk.Label(result_frame, text=f"R{i}").grid(row=i + 1, column=0)
+    ttk.Label(result_frame, textvariable=reg_values[f"R{i}"]).grid(row=i + 1, column=1)
+
+# Add space between the results and the stats
+ttk.Separator(root, orient=tk.VERTICAL).grid(row=0, column=2, rowspan=2, padx=10, pady=10)
+
+stats_frame = ttk.LabelFrame(root, text="Simulation Stats")
+stats_frame.grid(row=0, column=3, rowspan=2, padx=10, pady=10)
+ipc_label = ttk.Label(stats_frame, text="IPC:")
+ipc_label.grid(row=0, column=0, sticky="e",pady=10)
+branches_label = ttk.Label(stats_frame, text="Branches:")
+branches_label.grid(row=1, column=0, sticky="e",pady=10)
+mispredictions_label = ttk.Label(stats_frame, text="Mispredictions:")
+mispredictions_label.grid(row=2, column=0, sticky="e",pady=10)
+
+ipc_value = StringVar()
+branches_value = StringVar()
+mispredictions_value = StringVar()
+
+ipc_label_value = ttk.Label(stats_frame, textvariable=ipc_value)
+ipc_label_value.grid(row=0, column=1, sticky="w")
+branches_label_value = ttk.Label(stats_frame, textvariable=branches_value)
+branches_label_value.grid(row=1, column=1, sticky="w")
+mispredictions_label_value = ttk.Label(stats_frame, textvariable=mispredictions_value)
+mispredictions_label_value.grid(row=2, column=1, sticky="w")
+
 
 ttk.Button(root, text="Run Simulation", command=run_simulation).grid(row=2, column=0, columnspan=2, pady=10)
 ttk.Button(root, text="Reset Simulation", command=reset_simulation).grid(row=2, column=2, pady=10)
